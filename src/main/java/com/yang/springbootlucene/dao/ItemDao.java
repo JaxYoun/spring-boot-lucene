@@ -6,6 +6,9 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
+/**
+ * @author YYX
+ */
 @Mapper
 public interface ItemDao {
 

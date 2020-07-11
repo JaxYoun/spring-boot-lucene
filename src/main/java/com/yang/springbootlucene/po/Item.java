@@ -2,6 +2,9 @@ package com.yang.springbootlucene.po;
 
 import lombok.Data;
 
+/**
+ * @author YYX
+ */
 @Data
 public class Item {
     //商品主键id
