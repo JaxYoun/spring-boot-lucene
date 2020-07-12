@@ -25,6 +25,12 @@ public class LuceneController {
     }
 
     @SneakyThrows
+    @GetMapping("/typeAdd")
+    public void typeAdd() {
+        this.luceneService.typeAdd();
+    }
+
+    @SneakyThrows
     @GetMapping("/deleteAll")
     public void deleteAll() {
         this.luceneService.deleteAll();

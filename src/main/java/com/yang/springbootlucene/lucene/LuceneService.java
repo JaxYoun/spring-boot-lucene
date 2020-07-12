@@ -4,9 +4,7 @@ import com.yang.springbootlucene.dao.ItemDao;
 import com.yang.springbootlucene.po.Item;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.TextField;
+import org.apache.lucene.document.*;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -20,12 +18,14 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.wltea.analyzer.lucene.IKAnalyzer;
 
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -67,7 +67,8 @@ public class LuceneService {
         });
 
         //3. 创建分词器（标准分词器），对英文、德文友好，中文会被分为单字
-        Analyzer analyzer = new StandardAnalyzer();
+//        Analyzer analyzer = new StandardAnalyzer();
+        Analyzer analyzer = new IKAnalyzer();
 
         //4. 创建Directory目录对象，用于存储索引库
         Directory directory = FSDirectory.open(Paths.get(this.luceneIndexDir));
@@ -90,6 +91,101 @@ public class LuceneService {
         //8. 释放IO对象
         indexWriter.flush();
         indexWriter.close();
+        directory.close();
+    }
+
+    /**
+     * 严格按照哦字段类型，构建索引
+     *
+     * @throws Exception
+     */
+    public void typeAdd() throws Exception {
+        //1. 从DB获取Record列表
+        List<Item> itemList = this.itemDao.listAll();
+
+        //2. 将Record列表转换为Document列表
+        List<Document> documentList = itemList.parallelStream().map(it -> {
+            Document doc = new Document();
+
+            /**
+             * 是否分词：否
+             * 是否索引：是
+             * 是否存储：是
+             */
+            doc.add(new StringField("id", it.getId(), Field.Store.YES));
+
+            /**
+             * 是否分词：是
+             * 是否索引：是
+             * 是否存储：是
+             */
+            doc.add(new TextField("name", it.getName(), Field.Store.YES));
+
+            /**
+             * 是否分词：是，要分词（根据Lucene底层算法决定）
+             * 是否索引：是
+             * 是否存储：是
+             */
+            doc.add(new IntPoint("price", it.getPrice()));
+            doc.add(new StoredField("price", it.getPrice()));
+
+            /**
+             * 是否分词：否
+             * 是否索引：否
+             * 是否存储：是
+             */
+            doc.add(new TextField("num", String.valueOf(it.getNum()), Field.Store.NO));
+
+            /**
+             * 是否分词：否
+             * 是否索引：否
+             * 是否存储：是
+             */
+            doc.add(new StoredField("image", it.getImage()));
+
+            /**
+             * 是否分词：否
+             * 是否索引：是
+             * 是否存储：是
+             */
+            doc.add(new StringField("categoryName", it.getCategoryName(), Field.Store.YES));
+
+            /**
+             * 是否分词：否
+             * 是否索引：是
+             * 是否存储：是
+             */
+            doc.add(new StringField("brandName", it.getBrandName(), Field.Store.YES));
+
+            return doc;
+        }).collect(Collectors.toList());
+
+        //3. 创建分词器（标准分词器），对英文、德文友好，中文会被分为单字
+//        Analyzer analyzer = new StandardAnalyzer();
+        Analyzer analyzer = new IKAnalyzer();
+
+        //4. 创建Directory目录对象，用于存储索引库
+        Directory directory = FSDirectory.open(Paths.get(this.luceneIndexDir));
+
+        //5. 创建indexWriterConfig，并在其中指定分词器
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+
+        //6. 创建indexWriter，并为其指定存储目录
+        IndexWriter indexWriter = new IndexWriter(directory, config);
+
+        //7. 写入文档到索引库
+        documentList.parallelStream().forEach(it -> {
+            try {
+                indexWriter.addDocument(it);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
+        //8. 释放IO对象
+        indexWriter.flush();
+        indexWriter.close();
+        directory.close();
     }
 
     public void search(String key) throws Exception {
